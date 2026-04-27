@@ -346,6 +346,12 @@ fn fixed_delay_sync_generic_wait_clean() {
 }
 
 #[test]
+fn fixed_delay_sync_zero_timeout_clean() {
+    let src = "setTimeout(flushPendingCallbacks, 0);\n";
+    assert!(no_rule(src, "t.ts", "fixed-delay-sync"));
+}
+
+#[test]
 fn fixed_delay_sync_clean() {
     let src = "await waitForElement(locator);\nsetTimeout(saveDraft, debounceMs);\n";
     assert!(no_rule(src, "t.ts", "fixed-delay-sync"));

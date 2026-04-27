@@ -61,5 +61,9 @@ fn is_test_framework_wait(line: &str) -> bool {
 
 fn has_numeric_delay(line: &str) -> bool {
     line.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
-        .any(|token| token.len() >= 2 && token.chars().all(|c| c.is_ascii_digit()))
+        .any(|token| {
+            token.len() >= 2
+                && token.chars().all(|c| c.is_ascii_digit())
+                && token.parse::<u64>().is_ok_and(|delay| delay > 0)
+        })
 }
