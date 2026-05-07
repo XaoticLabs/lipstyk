@@ -12,6 +12,20 @@ binary = "target/release/lipstyk-agent"
 ping_method = "get_tools"
 timeout_ms = 5000
 
+[config.threshold]
+type = "number"
+label = "Detection threshold"
+description = "Minimum slop score (0.0–1.0) to flag. Lower = stricter"
+required = false
+default = "0.5"
+
+[config.severity_filter]
+type = "enum"
+label = "Minimum severity"
+description = "Only report diagnostics at or above this level"
+values = ["info", "warning", "error"]
+default = "warning"
+
 [secrets]
 required = []
 optional = []
