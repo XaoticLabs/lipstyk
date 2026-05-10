@@ -166,10 +166,10 @@ impl<'ast> Visit<'ast> for TokenCollector {
     }
 
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
-        if let syn::Expr::Path(path) = node.func.as_ref() {
-            if let Some(last) = path.path.segments.last() {
-                self.tokens.push(last.ident.to_string());
-            }
+        if let syn::Expr::Path(path) = node.func.as_ref()
+            && let Some(last) = path.path.segments.last()
+        {
+            self.tokens.push(last.ident.to_string());
         }
         syn::visit::visit_expr_call(self, node);
     }

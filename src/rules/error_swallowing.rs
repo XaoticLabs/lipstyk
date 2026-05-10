@@ -87,17 +87,16 @@ fn looks_like_result_chain(node: &syn::ExprMethodCall) -> bool {
 
     // If the chain ends in a function call, check for benign Result
     // producers where defaulting is the correct handling (env::var, etc.)
-    if let syn::Expr::Call(call) = expr {
-        if let syn::Expr::Path(path) = call.func.as_ref() {
-            if let Some(last) = path.path.segments.last() {
-                let fn_name = last.ident.to_string();
-                if matches!(
-                    fn_name.as_str(),
-                    "var" | "var_os" | "current_dir" | "current_exe"
-                ) {
-                    return false;
-                }
-            }
+    if let syn::Expr::Call(call) = expr
+        && let syn::Expr::Path(path) = call.func.as_ref()
+        && let Some(last) = path.path.segments.last()
+    {
+        let fn_name = last.ident.to_string();
+        if matches!(
+            fn_name.as_str(),
+            "var" | "var_os" | "current_dir" | "current_exe"
+        ) {
+            return false;
         }
     }
 
