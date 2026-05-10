@@ -123,6 +123,15 @@ impl Linter {
         linter.add_source_rule(Box::new(crate::java::bare_catch::BareCatch));
         linter.add_source_rule(Box::new(crate::java::comment_depth::CommentDepth));
 
+        // Elixir rules
+        linter.add_source_rule(Box::new(crate::elixir::bang_overuse::BangOveruse));
+        linter.add_source_rule(Box::new(crate::elixir::generic_naming::GenericNaming));
+        linter.add_source_rule(Box::new(crate::elixir::io_inspect_debug::IoInspectDebug));
+        linter.add_source_rule(Box::new(crate::elixir::rescue_all::RescueAll));
+        linter.add_source_rule(Box::new(
+            crate::elixir::restating_comments::RestatingComments,
+        ));
+
         // Go rules
         linter.add_source_rule(Box::new(crate::golang::error_handling::ErrorHandling));
         linter.add_source_rule(Box::new(crate::golang::antipatterns::Antipatterns));
@@ -178,7 +187,8 @@ impl Linter {
     }
 
     pub fn rule_counts(&self) -> RuleCounts {
-        let (mut html, mut css, mut ts, mut js, mut py, mut java, mut go) = (0, 0, 0, 0, 0, 0, 0);
+        let (mut html, mut css, mut ts, mut js, mut py, mut java, mut go, mut elixir) =
+            (0, 0, 0, 0, 0, 0, 0, 0);
         let (mut shell, mut docker, mut yaml, mut markdown, mut text) = (0, 0, 0, 0, 0);
 
         for rule in &self.source_rules {
@@ -196,6 +206,7 @@ impl Linter {
                     Lang::Yaml => yaml += 1,
                     Lang::Markdown => markdown += 1,
                     Lang::Text => text += 1,
+                    Lang::Elixir => elixir += 1,
                 }
             }
         }
@@ -214,6 +225,7 @@ impl Linter {
             yaml,
             markdown,
             text,
+            elixir,
         }
     }
 
@@ -401,6 +413,7 @@ pub struct RuleCounts {
     pub yaml: usize,
     pub markdown: usize,
     pub text: usize,
+    pub elixir: usize,
 }
 
 impl RuleCounts {
@@ -419,6 +432,7 @@ impl RuleCounts {
             + self.yaml
             + self.markdown
             + self.text
+            + self.elixir
     }
 }
 

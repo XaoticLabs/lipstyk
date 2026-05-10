@@ -4,7 +4,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 const SUPPORTED_EXTENSIONS: &[&str] = &[
     "rs", "html", "htm", "css", "vue", "svelte", "ts", "tsx", "js", "jsx", "py", "java", "go",
-    "sh", "bash", "zsh", "yml", "yaml", "md", "mdx", "txt", "text", "email",
+    "sh", "bash", "zsh", "yml", "yaml", "md", "mdx", "txt", "text", "email", "ex", "exs",
 ];
 
 /// Filenames without extensions that lipstyk recognizes.

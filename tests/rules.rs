@@ -582,6 +582,86 @@ fn java_restating_comment_fires() {
     assert!(has_rule(src, "t.java", "java-restating-comment"));
 }
 
+// ── Elixir rules ────────────────────────────────────────────────
+
+#[test]
+fn elixir_bang_overuse_fires() {
+    let src = r#"
+defmodule M do
+  def run do
+    {:ok, a} = File.read!("a")
+    {:ok, b} = File.read!("b")
+    {:ok, c} = File.read!("c")
+    Map.fetch!(a, :k)
+  end
+end
+"#;
+    assert!(has_rule(src, "t.ex", "elixir-bang-overuse"));
+}
+
+#[test]
+fn elixir_bang_overuse_clean() {
+    let src = r#"
+defmodule M do
+  def run do
+    with {:ok, a} <- File.read("a"),
+         {:ok, b} <- File.read("b") do
+      {:ok, {a, b}}
+    end
+  end
+end
+"#;
+    assert!(no_rule(src, "t.ex", "elixir-bang-overuse"));
+}
+
+#[test]
+fn elixir_generic_naming_fires() {
+    let src = "defmodule M do\n  def process(data), do: data\nend\n";
+    assert!(has_rule(src, "t.ex", "elixir-generic-naming"));
+}
+
+#[test]
+fn elixir_generic_naming_clean() {
+    let src = "defmodule M do\n  def normalize_email(addr), do: addr\nend\n";
+    assert!(no_rule(src, "t.ex", "elixir-generic-naming"));
+}
+
+#[test]
+fn elixir_io_inspect_debug_fires() {
+    let src = "defmodule M do\n  def run(x) do\n    IO.inspect(x)\n    x\n  end\nend\n";
+    assert!(has_rule(src, "t.ex", "elixir-io-inspect-debug"));
+}
+
+#[test]
+fn elixir_io_inspect_debug_clean() {
+    let src = "defmodule M do\n  require Logger\n  def run(x) do\n    Logger.debug(\"got x\")\n    x\n  end\nend\n";
+    assert!(no_rule(src, "t.ex", "elixir-io-inspect-debug"));
+}
+
+#[test]
+fn elixir_rescue_all_fires() {
+    let src = "defmodule M do\n  def run do\n    try do\n      do_work()\n    rescue\n      _ -> :ok\n    end\n  end\nend\n";
+    assert!(has_rule(src, "t.ex", "elixir-rescue-all"));
+}
+
+#[test]
+fn elixir_rescue_all_clean() {
+    let src = "defmodule M do\n  def run do\n    try do\n      do_work()\n    rescue\n      e in File.Error -> handle(e)\n    end\n  end\nend\n";
+    assert!(no_rule(src, "t.ex", "elixir-rescue-all"));
+}
+
+#[test]
+fn elixir_restating_comment_fires() {
+    let src = "# process the input data\nprocessed = process_input(data)\n";
+    assert!(has_rule(src, "t.ex", "elixir-restating-comment"));
+}
+
+#[test]
+fn elixir_restating_comment_spares_intent() {
+    let src = "# workaround for upstream bug in ecto\nuser = get_user(id)\n";
+    assert!(no_rule(src, "t.ex", "elixir-restating-comment"));
+}
+
 // ── New error handling rules ────────────────────────────────────
 
 #[test]

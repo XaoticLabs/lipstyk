@@ -87,13 +87,14 @@ lipstyk --summary src/                # one line per file
 | Go | `.go` | 8 | AST via `tree-sitter` + text |
 | HTML / CSS | `.html` `.htm` `.css` `.vue` `.svelte` | 6 | tag parser |
 | Java | `.java` | 4 | text (legacy) |
+| Elixir | `.ex` `.exs` | 5 | text |
 | Shell | `.sh` `.bash` `.zsh` | 3 | text |
 | Dockerfile | `Dockerfile` `Containerfile` | 1 | text (5 checks) |
 | Kubernetes YAML | `.yml` `.yaml` | 1 | content-sniffed (6 checks) |
 | CI/CD YAML | `.yml` `.yaml` | 1 | content-sniffed (5 checks) |
 | Markdown | `.md` `.mdx` | 3 | text |
 
-77 rules. Full reference in [RULES.md](RULES.md).
+82 rules. Full reference in [RULES.md](RULES.md).
 
 ## What it catches
 
