@@ -82,9 +82,7 @@ fn check_derives(
         return;
     }
 
-    let all_standard = names
-        .iter()
-        .all(|n| STANDARD_DERIVES.contains(&n.as_str()));
+    let all_standard = names.iter().all(|n| STANDARD_DERIVES.contains(&n.as_str()));
     if all_standard {
         return;
     }

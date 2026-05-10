@@ -216,8 +216,7 @@ fn b() -> Result<(), Box<dyn Error>> { Ok(()) }
 
 #[test]
 fn derive_stacking_fires() {
-    let src =
-        "#[derive(Debug, Clone, PartialEq, Eq, Hash, MyCustomTrait)]\nstruct S { x: i32 }\n";
+    let src = "#[derive(Debug, Clone, PartialEq, Eq, Hash, MyCustomTrait)]\nstruct S { x: i32 }\n";
     assert!(has_rule(src, "t.rs", "derive-stacking"));
 }
 
@@ -321,8 +320,7 @@ fn exclude_tests_skips_suffixed_test_file() {
 
 #[test]
 fn derive_stacking_exempts_standard_derives() {
-    let src =
-        "#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]\nstruct S { x: i32 }\n";
+    let src = "#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]\nstruct S { x: i32 }\n";
     assert!(no_rule(src, "t.rs", "derive-stacking"));
 }
 

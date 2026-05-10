@@ -34,10 +34,7 @@ impl Rule for StructuralRepetition {
 
         let mut shape_counts: HashMap<FnShape, Vec<usize>> = HashMap::new();
         for (i, entry) in visitor.entries.iter().enumerate() {
-            shape_counts
-                .entry(entry.shape.clone())
-                .or_default()
-                .push(i);
+            shape_counts.entry(entry.shape.clone()).or_default().push(i);
         }
 
         let mut diagnostics = Vec::new();
@@ -151,9 +148,7 @@ fn check_expr_flow(expr: &syn::Expr, has_if: &mut bool, has_match: &mut bool, ha
 }
 
 fn collect_body_tokens(block: &syn::Block) -> Vec<String> {
-    let mut collector = TokenCollector {
-        tokens: Vec::new(),
-    };
+    let mut collector = TokenCollector { tokens: Vec::new() };
     for stmt in &block.stmts {
         syn::visit::visit_stmt(&mut collector, stmt);
     }
