@@ -49,9 +49,14 @@ fn is_trivial_body(block: &syn::Block) -> bool {
 /// Check if the method chain leading to `.unwrap_or_default()` suggests
 /// the receiver is a Result (flag it) vs an Option (suppress it).
 fn looks_like_result_chain(node: &syn::ExprMethodCall) -> bool {
-    // Walk back through the receiver chain looking for method names
-    // that indicate Result vs Option provenance.
-    let option_methods = ["get", "first", "last", "find", "position", "nth", "peek"];
+    let option_methods = [
+        "get", "first", "last", "find", "position", "nth", "peek",
+        // Path/OsStr methods returning Option — fallback is intentional
+        "to_str", "file_name", "parent", "file_stem", "extension",
+        "strip_prefix", "strip_suffix",
+        // Iterator/collection lookups
+        "min", "max", "next", "next_back",
+    ];
     let result_methods = ["ok", "map_err", "or_else", "and_then"];
 
     let mut expr = node.receiver.as_ref();
@@ -65,6 +70,20 @@ fn looks_like_result_chain(node: &syn::ExprMethodCall) -> bool {
         }
         expr = call.receiver.as_ref();
     }
+
+    // If the chain ends in a function call, check for benign Result
+    // producers where defaulting is the correct handling (env::var, etc.)
+    if let syn::Expr::Call(call) = expr {
+        if let syn::Expr::Path(path) = call.func.as_ref() {
+            if let Some(last) = path.path.segments.last() {
+                let fn_name = last.ident.to_string();
+                if matches!(fn_name.as_str(), "var" | "var_os" | "current_dir" | "current_exe") {
+                    return false;
+                }
+            }
+        }
+    }
+
     // Unknown chain — flag conservatively but at low weight.
     true
 }

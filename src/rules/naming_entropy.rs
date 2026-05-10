@@ -58,7 +58,17 @@ impl Rule for NamingEntropy {
             let unique: HashSet<&str> = stems.iter().copied().collect();
             let ratio = unique.len() as f64 / stems.len() as f64;
 
-            if ratio < LOW_ENTROPY_THRESHOLD {
+            // Scale threshold for large files: single-domain files naturally
+            // reuse vocabulary across many functions without being AI-generated.
+            let line_count = _ctx.source.lines().count();
+            let threshold = if line_count > 2000 {
+                let reduction = (line_count as f64 - 2000.0) / 10000.0 * 0.10;
+                (LOW_ENTROPY_THRESHOLD - reduction).max(0.20)
+            } else {
+                LOW_ENTROPY_THRESHOLD
+            };
+
+            if ratio < threshold {
                 diagnostics.push(Diagnostic {
                     rule: "naming-entropy",
                     message: format!(

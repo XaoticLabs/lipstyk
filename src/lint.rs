@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::config::Config;
 use crate::diagnostic::SlopScore;
 use crate::diff;
-use crate::rules::{LintContext, Rule};
+use crate::rules::{LintContext, Rule, is_test_file};
 use crate::source_rule::{Lang, SourceContext, SourceRule};
 use tracing::{debug, info, instrument, warn};
 
@@ -272,6 +272,10 @@ impl Linter {
             .extension()
             .and_then(|e| e.to_str())
             .unwrap_or("");
+
+        if self.exclude_tests && ext == "rs" && is_test_file(filename) {
+            return Ok(SlopScore::new(filename.to_string(), Vec::new()));
+        }
 
         let mut diagnostics = if ext == "rs" {
             self.lint_rust(filename, source)?
