@@ -216,7 +216,8 @@ fn b() -> Result<(), Box<dyn Error>> { Ok(()) }
 
 #[test]
 fn derive_stacking_fires() {
-    let src = "#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]\nstruct S { x: i32 }\n";
+    let src =
+        "#[derive(Debug, Clone, PartialEq, Eq, Hash, MyCustomTrait)]\nstruct S { x: i32 }\n";
     assert!(has_rule(src, "t.rs", "derive-stacking"));
 }
 
@@ -237,6 +238,118 @@ fn b() {}
 fn c() {}
 "#;
     assert!(has_rule(src, "t.rs", "dead-code-markers"));
+}
+
+#[test]
+fn redundant_clone_suppressed_in_move_closure() {
+    let src = r#"
+fn f(items: Vec<String>) {
+    std::thread::spawn(move || {
+        let copy = items.clone();
+        println!("{:?}", copy);
+    });
+}
+"#;
+    assert!(no_rule(src, "t.rs", "redundant-clone"));
+}
+
+#[test]
+fn redundant_clone_suppressed_in_async_move() {
+    let src = r#"
+async fn f(val: String) {
+    let cloned = val.clone();
+    tokio::spawn(async move {
+        println!("{cloned}");
+    });
+}
+"#;
+    assert!(no_rule(src, "t.rs", "redundant-clone"));
+}
+
+#[test]
+fn structural_repetition_skips_dissimilar_bodies() {
+    // Three functions with same shape (0 params, 1 stmt) but different body tokens.
+    // Should NOT be flagged — they share no real logic.
+    let src = r#"
+fn version() -> &'static str { "1.0" }
+fn timeout() -> u64 { 30 }
+fn enabled() -> bool { true }
+fn name() -> &'static str { "app" }
+"#;
+    assert!(no_rule(src, "t.rs", "structural-repetition"));
+}
+
+#[test]
+fn structural_repetition_skips_common_suffix() {
+    let src = r#"
+fn auth_handler(r: Request) -> Response { validate(r); respond(r) }
+fn data_handler(r: Request) -> Response { validate(r); respond(r) }
+fn log_handler(r: Request) -> Response { validate(r); respond(r) }
+"#;
+    assert!(no_rule(src, "t.rs", "structural-repetition"));
+}
+
+#[test]
+fn exclude_tests_skips_test_module_file() {
+    let src = r#"
+pub fn run_tests() {
+    let x = Some(1).unwrap();
+    let y = Some(2).unwrap();
+    let z = Some(3).unwrap();
+}
+"#;
+    let linter = Linter::with_defaults().exclude_tests(true);
+    let score = linter.lint_source("src/tests.rs", src).unwrap();
+    assert!(
+        score.diagnostics.is_empty(),
+        "test module file should be excluded: {:?}",
+        score.diagnostics
+    );
+}
+
+#[test]
+fn exclude_tests_skips_suffixed_test_file() {
+    let src = "fn f() { let x = Some(1).unwrap(); }\n";
+    let linter = Linter::with_defaults().exclude_tests(true);
+    let score = linter.lint_source("src/db_test.rs", src).unwrap();
+    assert!(
+        score.diagnostics.is_empty(),
+        "suffixed test file should be excluded: {:?}",
+        score.diagnostics
+    );
+}
+
+#[test]
+fn derive_stacking_exempts_standard_derives() {
+    let src =
+        "#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]\nstruct S { x: i32 }\n";
+    assert!(no_rule(src, "t.rs", "derive-stacking"));
+}
+
+#[test]
+fn derive_stacking_fires_with_exotic_derives() {
+    let src = "#[derive(Debug, Clone, PartialEq, Eq, Hash, MyCustomTrait)]\nstruct S { x: i32 }\n";
+    assert!(has_rule(src, "t.rs", "derive-stacking"));
+}
+
+#[test]
+fn error_swallowing_suppressed_for_file_name() {
+    let src = r#"
+fn f(path: &std::path::Path) {
+    let name = path.file_name().unwrap_or_default();
+}
+"#;
+    assert!(no_rule(src, "t.rs", "error-swallowing"));
+}
+
+#[test]
+fn error_swallowing_suppressed_for_env_var() {
+    let src = r#"
+fn f() {
+    let val = std::env::var("FOO").unwrap_or_default();
+}
+"#;
+    assert!(no_rule(src, "t.rs", "error-swallowing"));
 }
 
 // ── HTML/CSS rules ──────────────────────────────────────────────

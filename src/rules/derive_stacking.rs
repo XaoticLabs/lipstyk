@@ -12,6 +12,20 @@ pub struct DeriveStacking;
 
 const DERIVE_THRESHOLD: usize = 6;
 
+const STANDARD_DERIVES: &[&str] = &[
+    "Debug",
+    "Clone",
+    "Copy",
+    "Default",
+    "PartialEq",
+    "Eq",
+    "PartialOrd",
+    "Ord",
+    "Hash",
+    "Serialize",
+    "Deserialize",
+];
+
 impl Rule for DeriveStacking {
     fn name(&self) -> &'static str {
         "derive-stacking"
@@ -64,18 +78,27 @@ fn check_derives(
     hits: &mut Vec<Diagnostic>,
 ) {
     let (count, names) = count_derives(attrs);
-    if count >= DERIVE_THRESHOLD {
-        hits.push(Diagnostic {
-            rule: "derive-stacking",
-            message: format!(
-                "`{type_name}` derives {count} traits ({}) — are all of these needed?",
-                names.join(", ")
-            ),
-            line,
-            severity: Severity::Hint,
-            weight: 0.75,
-        });
+    if count < DERIVE_THRESHOLD {
+        return;
     }
+
+    let all_standard = names
+        .iter()
+        .all(|n| STANDARD_DERIVES.contains(&n.as_str()));
+    if all_standard {
+        return;
+    }
+
+    hits.push(Diagnostic {
+        rule: "derive-stacking",
+        message: format!(
+            "`{type_name}` derives {count} traits ({}) — are all of these needed?",
+            names.join(", ")
+        ),
+        line,
+        severity: Severity::Hint,
+        weight: 0.75,
+    });
 }
 
 impl<'ast> Visit<'ast> for DeriveVisitor {

@@ -25,19 +25,15 @@ impl Rule for RedundantClone {
             hits: Vec::new(),
             closure_depth: 0,
             async_depth: 0,
+            move_context_depth: 0,
         };
         visitor.visit_file(file);
 
-        // Escalation thresholds — raised from 5/10 to 15/30 after
-        // dogfood showed framework-mandated clones dominating scores
-        // in Axum routes and tower-lsp handlers.
+        // Escalation: cap at Warning. Without type information we can't
+        // distinguish necessary clones (Arc, Sender, async move) from
+        // gratuitous ones, so SLOP confidence is unfounded.
         let count = visitor.hits.len();
-        if count > 30 {
-            for d in &mut visitor.hits {
-                d.severity = Severity::Slop;
-                d.weight = 1.5;
-            }
-        } else if count > 15 {
+        if count > 15 {
             for d in &mut visitor.hits {
                 d.severity = Severity::Warning;
                 d.weight = 1.0;
@@ -52,13 +48,32 @@ struct CloneVisitor {
     hits: Vec<Diagnostic>,
     closure_depth: usize,
     async_depth: usize,
+    move_context_depth: usize,
 }
 
 impl<'ast> Visit<'ast> for CloneVisitor {
     fn visit_expr_closure(&mut self, node: &'ast syn::ExprClosure) {
         self.closure_depth += 1;
+        if node.capture.is_some() {
+            self.move_context_depth += 1;
+        }
         syn::visit::visit_expr_closure(self, node);
+        if node.capture.is_some() {
+            self.move_context_depth -= 1;
+        }
         self.closure_depth -= 1;
+    }
+
+    fn visit_expr_async(&mut self, node: &'ast syn::ExprAsync) {
+        self.async_depth += 1;
+        if node.capture.is_some() {
+            self.move_context_depth += 1;
+        }
+        syn::visit::visit_expr_async(self, node);
+        if node.capture.is_some() {
+            self.move_context_depth -= 1;
+        }
+        self.async_depth -= 1;
     }
 
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
@@ -84,10 +99,12 @@ impl<'ast> Visit<'ast> for CloneVisitor {
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
         if node.method == "clone" && node.args.is_empty() {
             let suppress = (self.closure_depth > 0 && is_field_access_clone(node))
-                // Clone on a method call return: foo().clone() — often framework pattern
                 || is_method_return_clone(node)
                 // Inside async fn body with clone on a variable — likely moving into a future
-                || (self.async_depth > 0 && is_variable_clone(node));
+                || (self.async_depth > 0 && is_variable_clone(node))
+                // Inside move closure or async move block — clone is required to
+                // satisfy ownership transfer, not gratuitous
+                || (self.move_context_depth > 0 && is_variable_clone(node));
 
             if !suppress {
                 self.hits.push(Diagnostic {

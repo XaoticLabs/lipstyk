@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::diagnostic::{Diagnostic, Severity};
 use crate::rules::{LintContext, Rule};
@@ -12,7 +12,9 @@ use syn::visit::Visit;
 ///
 /// We hash each function's "shape" (param count, body statement count,
 /// return type presence, control flow kind) and flag files with high
-/// shape duplication.
+/// shape duplication, but ONLY when the functions also share significant
+/// body-token similarity (>50% Jaccard overlap). Shape alone is not
+/// sufficient — unrelated getters or constant functions share trivial shapes.
 pub struct StructuralRepetition;
 
 impl Rule for StructuralRepetition {
@@ -21,49 +23,57 @@ impl Rule for StructuralRepetition {
     }
 
     fn check(&self, file: &syn::File, _ctx: &LintContext) -> Vec<Diagnostic> {
-        let mut visitor = ShapeVisitor { shapes: Vec::new() };
+        let mut visitor = ShapeVisitor {
+            entries: Vec::new(),
+        };
         visitor.visit_file(file);
 
-        if visitor.shapes.len() < 4 {
+        if visitor.entries.len() < 4 {
             return Vec::new();
         }
 
-        // Count how many functions share each shape.
-        let mut shape_counts: HashMap<FnShape, Vec<(String, usize)>> = HashMap::new();
-        for (name, line, shape) in &visitor.shapes {
+        let mut shape_counts: HashMap<FnShape, Vec<usize>> = HashMap::new();
+        for (i, entry) in visitor.entries.iter().enumerate() {
             shape_counts
-                .entry(shape.clone())
+                .entry(entry.shape.clone())
                 .or_default()
-                .push((name.clone(), *line));
+                .push(i);
         }
 
         let mut diagnostics = Vec::new();
 
-        for (shape, fns) in &shape_counts {
-            if fns.len() >= 3 && shape.stmt_count > 0 {
-                let names: Vec<&str> = fns.iter().map(|(n, _)| n.as_str()).collect();
-
-                // Exempt checklist patterns: functions sharing a common prefix
-                // (check_*, collect_*, validate_*) are intentional decomposition.
-                if has_common_prefix(&names) {
-                    continue;
-                }
-
-                let line = fns[0].1;
-                diagnostics.push(Diagnostic {
-                    rule: "structural-repetition",
-                    message: format!(
-                        "{} functions share the same shape ({} params, {} stmts): {}",
-                        fns.len(),
-                        shape.param_count,
-                        shape.stmt_count,
-                        names.join(", ")
-                    ),
-                    line,
-                    severity: Severity::Warning,
-                    weight: 1.5,
-                });
+        for (shape, indices) in &shape_counts {
+            if indices.len() < 3 || shape.stmt_count == 0 {
+                continue;
             }
+
+            let names: Vec<&str> = indices
+                .iter()
+                .map(|&i| visitor.entries[i].name.as_str())
+                .collect();
+
+            if has_common_prefix(&names) || has_common_suffix(&names) {
+                continue;
+            }
+
+            if !group_has_similarity(&visitor.entries, indices, 0.5) {
+                continue;
+            }
+
+            let line = visitor.entries[indices[0]].line;
+            diagnostics.push(Diagnostic {
+                rule: "structural-repetition",
+                message: format!(
+                    "{} functions share the same shape ({} params, {} stmts): {}",
+                    indices.len(),
+                    shape.param_count,
+                    shape.stmt_count,
+                    names.join(", ")
+                ),
+                line,
+                severity: Severity::Warning,
+                weight: 1.5,
+            });
         }
 
         diagnostics
@@ -80,8 +90,15 @@ struct FnShape {
     has_loop: bool,
 }
 
+struct FnEntry {
+    name: String,
+    line: usize,
+    shape: FnShape,
+    body_tokens: Vec<String>,
+}
+
 struct ShapeVisitor {
-    shapes: Vec<(String, usize, FnShape)>,
+    entries: Vec<FnEntry>,
 }
 
 fn shape_of_sig_and_block(sig: &syn::Signature, block: &syn::Block) -> FnShape {
@@ -133,6 +150,85 @@ fn check_expr_flow(expr: &syn::Expr, has_if: &mut bool, has_match: &mut bool, ha
     }
 }
 
+fn collect_body_tokens(block: &syn::Block) -> Vec<String> {
+    let mut collector = TokenCollector {
+        tokens: Vec::new(),
+    };
+    for stmt in &block.stmts {
+        syn::visit::visit_stmt(&mut collector, stmt);
+    }
+    collector.tokens
+}
+
+struct TokenCollector {
+    tokens: Vec<String>,
+}
+
+impl<'ast> Visit<'ast> for TokenCollector {
+    fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
+        self.tokens.push(node.method.to_string());
+        syn::visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(path) = node.func.as_ref() {
+            if let Some(last) = path.path.segments.last() {
+                self.tokens.push(last.ident.to_string());
+            }
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+
+    fn visit_expr_macro(&mut self, node: &'ast syn::ExprMacro) {
+        if let Some(last) = node.mac.path.segments.last() {
+            self.tokens.push(last.ident.to_string());
+        }
+        syn::visit::visit_expr_macro(self, node);
+    }
+}
+
+fn group_has_similarity(entries: &[FnEntry], indices: &[usize], threshold: f64) -> bool {
+    if indices.len() < 2 {
+        return false;
+    }
+
+    let mut total_sim = 0.0;
+    let mut pairs = 0usize;
+
+    for i in 0..indices.len() {
+        for j in (i + 1)..indices.len() {
+            let a = &entries[indices[i]].body_tokens;
+            let b = &entries[indices[j]].body_tokens;
+            total_sim += jaccard(a, b);
+            pairs += 1;
+        }
+    }
+
+    if pairs == 0 {
+        return false;
+    }
+
+    (total_sim / pairs as f64) >= threshold
+}
+
+fn jaccard(a: &[String], b: &[String]) -> f64 {
+    // No tokens extracted — can't assess similarity, assume different
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+
+    let set_a: HashSet<&str> = a.iter().map(String::as_str).collect();
+    let set_b: HashSet<&str> = b.iter().map(String::as_str).collect();
+    let intersection = set_a.intersection(&set_b).count();
+    let union = set_a.union(&set_b).count();
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f64 / union as f64
+    }
+}
+
 /// Check if all function names share a common prefix (e.g. check_*, collect_*).
 /// This indicates intentional decomposition, not slop repetition.
 fn has_common_prefix(names: &[&str]) -> bool {
@@ -140,15 +236,34 @@ fn has_common_prefix(names: &[&str]) -> bool {
         return false;
     }
 
-    // Find common prefix of all names.
     let first = names[0];
     for prefix_len in (3..first.len()).rev() {
         let prefix = &first[..prefix_len];
-        // Must end at an underscore boundary to be a meaningful prefix.
         if !prefix.ends_with('_') {
             continue;
         }
         if names.iter().all(|n| n.starts_with(prefix)) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Check if all function names share a common suffix (e.g. *_handler, *_endpoint).
+fn has_common_suffix(names: &[&str]) -> bool {
+    if names.len() < 2 {
+        return false;
+    }
+
+    let first = names[0];
+    let len = first.len();
+    for suffix_len in (3..len).rev() {
+        let suffix = &first[len - suffix_len..];
+        if !suffix.starts_with('_') {
+            continue;
+        }
+        if names.iter().all(|n| n.ends_with(suffix)) {
             return true;
         }
     }
@@ -161,7 +276,13 @@ impl<'ast> Visit<'ast> for ShapeVisitor {
         let name = node.sig.ident.to_string();
         let line = node.sig.ident.span().start().line;
         let shape = shape_of_sig_and_block(&node.sig, &node.block);
-        self.shapes.push((name, line, shape));
+        let body_tokens = collect_body_tokens(&node.block);
+        self.entries.push(FnEntry {
+            name,
+            line,
+            shape,
+            body_tokens,
+        });
         syn::visit::visit_item_fn(self, node);
     }
 
@@ -173,7 +294,13 @@ impl<'ast> Visit<'ast> for ShapeVisitor {
         }
         let line = node.sig.ident.span().start().line;
         let shape = shape_of_sig_and_block(&node.sig, &node.block);
-        self.shapes.push((name, line, shape));
+        let body_tokens = collect_body_tokens(&node.block);
+        self.entries.push(FnEntry {
+            name,
+            line,
+            shape,
+            body_tokens,
+        });
         syn::visit::visit_impl_item_fn(self, node);
     }
 }

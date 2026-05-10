@@ -38,6 +38,21 @@ pub trait Rule: Send + Sync {
     fn check(&self, file: &syn::File, ctx: &LintContext) -> Vec<Diagnostic>;
 }
 
+/// Check whether a filename indicates a test module file.
+///
+/// Covers `tests.rs`, `test.rs`, `*_test.rs`, `*_tests.rs` — files
+/// conventionally referenced via `#[cfg(test)] mod tests;` from a
+/// parent module. Does NOT match by directory (e.g. `tests/`) because
+/// that would also catch test fixtures and integration test helpers.
+pub fn is_test_file(filename: &str) -> bool {
+    let path = std::path::Path::new(filename);
+    if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+        return false;
+    }
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    stem == "tests" || stem == "test" || stem.ends_with("_test") || stem.ends_with("_tests")
+}
+
 /// Check whether a syn attribute list contains `#[test]`.
 pub fn has_test_attr(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|a| a.path().is_ident("test"))

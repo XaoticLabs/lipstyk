@@ -122,14 +122,14 @@ fn validate(data: &str) -> Result<(), Box<dyn Error>> {
     }
 }
 
-// derive stacking
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+// derive stacking (with exotic derive — standard-only stacks are now exempt)
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Arbitrary)]
 struct Config {
     name: String,
     value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, CustomSerialize)]
 struct Settings {
     items: Vec<String>,
 }
@@ -144,23 +144,27 @@ fn another_unused() -> String { String::new() }
 #[allow(unused)]
 fn yet_another() {}
 
-// structurally repetitive functions (all same shape: 1 param, 2 stmts, returns)
+// structurally repetitive functions (same shape AND similar body tokens)
 fn transform_a(input: &str) -> String {
-    let upper = input.to_uppercase();
-    upper
+    let result = input.to_uppercase();
+    println!("{}", result);
+    result
 }
 
 fn transform_b(input: &str) -> String {
-    let trimmed = input.trim().to_string();
-    trimmed
+    let result = input.to_uppercase();
+    println!("{}", result);
+    result
 }
 
 fn transform_c(input: &str) -> String {
-    let lower = input.to_lowercase();
-    lower
+    let result = input.to_uppercase();
+    println!("{}", result);
+    result
 }
 
 fn transform_d(input: &str) -> String {
-    let replaced = input.replace(' ', "_");
-    replaced
+    let result = input.to_uppercase();
+    println!("{}", result);
+    result
 }
