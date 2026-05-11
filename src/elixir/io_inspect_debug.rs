@@ -34,6 +34,7 @@ impl SourceRule for IoInspectDebug {
                 || trimmed.contains("IO.puts")
                 || trimmed.contains("dbg(")
                 || trimmed.ends_with("|> dbg")
+                || trimmed.contains("|> dbg(")
             {
                 hits.push(i + 1);
             }
