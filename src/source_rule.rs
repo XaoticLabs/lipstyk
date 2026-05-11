@@ -18,6 +18,7 @@ pub enum Lang {
     Yaml,
     Markdown,
     Text,
+    Elixir,
 }
 
 impl Lang {
@@ -34,6 +35,7 @@ impl Lang {
             "yml" | "yaml" => Some(Self::Yaml),
             "md" | "mdx" => Some(Self::Markdown),
             "txt" | "text" | "email" => Some(Self::Text),
+            "ex" | "exs" => Some(Self::Elixir),
             _ => None,
         }
     }

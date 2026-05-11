@@ -1,6 +1,6 @@
 # Lipstyk Rule Reference
 
-77 rules across 10 file types. Every finding is deterministic — no ML,
+82 rules across 11 file types. Every finding is deterministic — no ML,
 no classifiers.
 
 Severity levels:
@@ -129,6 +129,18 @@ Go AST collector understands error return types, method receivers,
 | `java-generic-naming` | Generic method names | W | 1.5 |
 | `java-restating-comment` | Comments restating code | W | 1.5 |
 | `java-comment-depth` | Per-function density, step narration | W→S | 1.5→3.0 |
+
+---
+
+## Elixir (5 rules, text)
+
+| Rule | What It Catches | Sev | Weight |
+|------|----------------|-----|--------|
+| `elixir-bang-overuse` | 3+ bang (`!`) calls — bypassing `{:ok, _} \| {:error, _}` | W→S | 1.5→3.0 |
+| `elixir-generic-naming` | Generic `def`/`defp` names | W | 1.5 |
+| `elixir-io-inspect-debug` | `IO.inspect` / `IO.puts` / `dbg` left in production code | W→S | 1.5→3.0 |
+| `elixir-rescue-all` | Catch-all `rescue _ ->` clauses | H→W | 0.75→1.5 |
+| `elixir-restating-comment` | Comments restating code | W | 1.5 |
 
 ---
 
