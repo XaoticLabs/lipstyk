@@ -21,7 +21,7 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: lipstyk-linux-x86_64
-          - os: macos-13
+          - os: macos-latest
             artifact: lipstyk-macos-x86_64
           - os: macos-14
             artifact: lipstyk-macos-arm64
